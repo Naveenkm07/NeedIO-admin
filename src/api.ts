@@ -71,4 +71,27 @@ export const api = {
     body: JSON.stringify(data),
   }),
   deleteFaq: (id: string) => fetchWithAuth(`/admin/faqs/${id}`, { method: 'DELETE' }),
+
+  // ADMIN: Support Tickets
+  getTickets: () => fetchWithAuth('/admin/tickets'),
+  replyToTicket: (id: string, message: string) => fetchWithAuth(`/admin/tickets/${id}/reply`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  }),
+  updateTicketStatus: (id: string, status: string) => fetchWithAuth(`/admin/tickets/${id}/status`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  }),
+
+  // ADMIN: Finance & Earnings
+  getEarnings: () => fetchWithAuth('/admin/earnings'),
+  processPayout: (userId: string, txId: string) => fetchWithAuth(`/admin/payouts/${userId}/${txId}`, {
+    method: 'POST',
+  }),
+
+  // ADMIN: User Suspension
+  suspendUser: (id: string, suspended: boolean) => fetchWithAuth(`/admin/users/${id}/suspend`, {
+    method: 'POST',
+    body: JSON.stringify({ suspended }),
+  }),
 };

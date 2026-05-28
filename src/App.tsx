@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Shield, CheckCircle2, XCircle, Loader2, LogOut, Edit2, Trash2, Moon, Sun, Users, Building2, Briefcase, Eye, Activity, CalendarDays, ClipboardCheck, Search, Download, Megaphone } from "lucide-react";
+import { Shield, CheckCircle2, XCircle, Loader2, LogOut, Edit2, Trash2, Moon, Sun, Users, Building2, Briefcase, Eye, Activity, CalendarDays, ClipboardCheck, Search, Download, Megaphone, MessageSquare, Send, Coins, AlertOctagon } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { api } from "./api";
 import { supabase } from "./supabase";
@@ -18,6 +18,19 @@ export default function App() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
   const [faqs, setFaqs] = useState<any[]>([]);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [replyText, setReplyText] = useState("");
+  const [isSendingReply, setIsSendingReply] = useState(false);
+  const [ticketFilter, setTicketFilter] = useState("all");
+  const [ticketSearch, setTicketSearch] = useState("");
+  
+  // Finance & Earnings States
+  const [earnings, setEarnings] = useState<any[]>([]);
+  const [selectedWorkerEarnings, setSelectedWorkerEarnings] = useState<any>(null);
+  const [financeSearch, setFinanceSearch] = useState("");
+  const [isProcessingPayout, setIsProcessingPayout] = useState(false);
+  
   const [loading, setLoading] = useState(false);
 
   // App Navigation & Search
@@ -100,18 +113,36 @@ export default function App() {
   const loadUsers = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [profilesData, authData, jobsData, appsData, faqsData] = await Promise.all([
+      const [profilesData, authData, jobsData, appsData, faqsData, ticketsData, earningsData] = await Promise.all([
         api.getUsers(),
         api.getAuthUsers(),
         api.getJobs(),
         api.getAllApplications(),
-        api.getFaqs()
+        api.getFaqs(),
+        api.getTickets(),
+        api.getEarnings()
       ]);
       setUsers(profilesData);
       setAuthUsers(authData);
       setJobs(jobsData);
       setApplications(appsData);
       setFaqs(faqsData);
+      setTickets(ticketsData);
+      setEarnings(earningsData);
+
+      // Safe update to avoid closure staleness in polling loop
+      setSelectedTicket((prevSelected: any) => {
+        if (!prevSelected) return null;
+        const updated = ticketsData.find((t: any) => t.id === prevSelected.id);
+        return updated ? updated : prevSelected;
+      });
+
+      // Keep selected worker earnings in sync
+      setSelectedWorkerEarnings((prevSelected: any) => {
+        if (!prevSelected) return null;
+        const updated = earningsData.find((e: any) => e.userId === prevSelected.userId);
+        return updated ? updated : prevSelected;
+      });
     } catch (err: any) {
       if (!silent) toast.error(err.message || "Failed to load data");
     } finally {
@@ -250,6 +281,79 @@ export default function App() {
       toast.error(err.message || "Failed to delete FAQ");
     }
   };
+
+  // --- SUPPORT TICKET HANDLERS ---
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTicket || !replyText.trim()) return;
+    try {
+      setIsSendingReply(true);
+      const updated = await api.replyToTicket(selectedTicket.id, replyText);
+      const updatedWithProfile = { ...updated, user: selectedTicket.user };
+      
+      setTickets(tickets.map(t => t.id === selectedTicket.id ? updatedWithProfile : t));
+      setSelectedTicket(updatedWithProfile);
+      setReplyText("");
+      toast.success("Reply sent successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send reply");
+    } finally {
+      setIsSendingReply(false);
+    }
+  };
+
+  const handleToggleTicketStatus = async (id: string, currentStatus: string) => {
+    try {
+      const newStatus = currentStatus === 'resolved' ? 'open' : 'resolved';
+      toast.loading("Updating status...");
+      const updated = await api.updateTicketStatus(id, newStatus);
+      const updatedWithProfile = { ...updated, user: selectedTicket.user };
+      
+      setTickets(tickets.map(t => t.id === id ? updatedWithProfile : t));
+      setSelectedTicket(updatedWithProfile);
+      toast.dismiss();
+      toast.success(`Ticket marked as ${newStatus}`);
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error("Failed to update ticket status");
+    }
+  };
+
+  // --- FINANCE & SUSPENSION HANDLERS ---
+  const handleToggleSuspend = async (id: string, currentStatus: boolean) => {
+    const confirmMsg = currentStatus 
+      ? "Lift suspension for this user? They will regain full platform access." 
+      : "Suspend this user? They will be immediately blocked from accessing the mobile app.";
+    if (!window.confirm(confirmMsg)) return;
+    try {
+      toast.loading(currentStatus ? "Lifting suspension..." : "Suspending user...");
+      const newStatus = !currentStatus;
+      await api.suspendUser(id, newStatus);
+      setUsers(users.map(u => u.id === id ? { ...u, suspended: newStatus } : u));
+      toast.dismiss();
+      toast.success(newStatus ? "User Suspended" : "Suspension Lifted");
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error("Failed to update suspension status");
+    }
+  };
+
+  const handleProcessPayout = async (userId: string, txId: string, amount: number) => {
+    if (!window.confirm(`Process payout of ₹${amount}?`)) return;
+    try {
+      setIsProcessingPayout(true);
+      toast.loading("Processing payout...");
+      await api.processPayout(userId, txId);
+      await loadUsers(true);
+      toast.dismiss();
+      toast.success(`Payout of ₹${amount} completed`);
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || "Failed to process payout");
+    } finally {
+      setIsProcessingPayout(false);
+    }
+  };
   // ---------------------
   
   // Data processing and filtering
@@ -370,7 +474,7 @@ export default function App() {
 
         {/* Navigation Tabs */}
         <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-2xl">
-          {["Dashboard", "Jobs", "Announcements", "FAQ"].map(tab => (
+          {["Dashboard", "Jobs", "Announcements", "FAQ", "Support", "Finance"].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -652,7 +756,12 @@ export default function App() {
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate pr-4">{company.name}</h3>
+                          <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate pr-4 flex items-center gap-2">
+                            {company.name}
+                            {company.suspended && (
+                              <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-405 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Suspended</span>
+                            )}
+                          </h3>
                           {/* Actions */}
                           <div className="flex items-center gap-2">
                             <button onClick={() => setViewingUser(company)} className="p-2 text-gray-500 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors" title="View Full Details">
@@ -660,6 +769,17 @@ export default function App() {
                             </button>
                             <button onClick={() => openEditModal(company)} className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Edit Name/Email">
                               <Edit2 size={18} />
+                            </button>
+                            <button 
+                              onClick={() => handleToggleSuspend(company.id, company.suspended)} 
+                              className={`p-2 rounded-lg transition-colors ${
+                                company.suspended 
+                                  ? 'text-red-650 hover:bg-red-100 dark:hover:bg-red-900/40 bg-red-50 dark:bg-red-900/20' 
+                                  : 'text-gray-500 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20'
+                              }`} 
+                              title={company.suspended ? "Lift Suspension" : "Suspend User"}
+                            >
+                              <AlertOctagon size={18} />
                             </button>
                             <button onClick={() => handleDelete(company.id)} className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete User">
                               <Trash2 size={18} />
@@ -722,7 +842,12 @@ export default function App() {
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate pr-4">{worker.name}</h3>
+                          <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate pr-4 flex items-center gap-2">
+                            {worker.name}
+                            {worker.suspended && (
+                              <span className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-405 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Suspended</span>
+                            )}
+                          </h3>
                           {/* Actions */}
                           <div className="flex items-center gap-2">
                             <button onClick={() => setViewingUser(worker)} className="p-2 text-gray-500 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors" title="View Full Details">
@@ -730,6 +855,17 @@ export default function App() {
                             </button>
                             <button onClick={() => openEditModal(worker)} className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Edit Name/Email">
                               <Edit2 size={18} />
+                            </button>
+                            <button 
+                              onClick={() => handleToggleSuspend(worker.id, worker.suspended)} 
+                              className={`p-2 rounded-lg transition-colors ${
+                                worker.suspended 
+                                  ? 'text-red-650 hover:bg-red-100 dark:hover:bg-red-900/40 bg-red-50 dark:bg-red-900/20' 
+                                  : 'text-gray-500 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20'
+                              }`} 
+                              title={worker.suspended ? "Lift Suspension" : "Suspend User"}
+                            >
+                              <AlertOctagon size={18} />
                             </button>
                             <button onClick={() => handleDelete(worker.id)} className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete User">
                               <Trash2 size={18} />
@@ -921,6 +1057,459 @@ export default function App() {
                     </div>
                   ))}
                   {faqs.length === 0 && <div className="text-center py-12 text-gray-500">No FAQs found. Add one!</div>}
+                </div>
+              </div>
+            )}
+
+            {/* SUPPORT TAB */}
+            {activeTab === "Support" && (
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl overflow-hidden shadow-sm flex flex-col lg:flex-row h-[70vh]">
+                {/* Left sidebar: Ticket list */}
+                <div className="w-full lg:w-96 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full bg-gray-50/50 dark:bg-gray-950/20">
+                  {/* Search & Header */}
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-800 space-y-3">
+                    <h3 className="font-black text-gray-900 dark:text-white text-base flex items-center gap-2">
+                      <MessageSquare className="text-blue-500" size={18} />
+                      Support Helpdesk
+                    </h3>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                      <input
+                        type="text"
+                        placeholder="Search tickets..."
+                        value={ticketSearch}
+                        onChange={e => setTicketSearch(e.target.value)}
+                        className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 pl-8 pr-4 py-2 rounded-xl text-xs outline-none focus:border-blue-500 dark:text-white transition-colors"
+                      />
+                    </div>
+                    
+                    {/* Filters */}
+                    <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
+                      {["all", "open", "resolved"].map(f => (
+                        <button
+                          key={f}
+                          onClick={() => setTicketFilter(f)}
+                          className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold capitalize transition-all ${
+                            ticketFilter === f
+                              ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                              : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+                          }`}
+                        >
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* List of tickets */}
+                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                    {tickets
+                      .filter(t => {
+                        if (ticketFilter === "open") return t.status !== "resolved";
+                        if (ticketFilter === "resolved") return t.status === "resolved";
+                        return true;
+                      })
+                      .filter(t => {
+                        if (!ticketSearch) return true;
+                        const lower = ticketSearch.toLowerCase();
+                        return (
+                          t.message?.toLowerCase().includes(lower) ||
+                          t.user?.name?.toLowerCase().includes(lower) ||
+                          t.user?.email?.toLowerCase().includes(lower)
+                        );
+                      })
+                      .map(t => {
+                        const isSelected = selectedTicket?.id === t.id;
+                        const lastMsg = t.replies.length > 0 ? t.replies[t.replies.length - 1].message : t.message;
+                        const lastSender = t.replies.length > 0 ? (t.replies[t.replies.length - 1].sender === 'support' ? 'You: ' : '') : '';
+                        const dateStr = new Date(t.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                        
+                        return (
+                          <div
+                            key={t.id}
+                            onClick={() => setSelectedTicket(t)}
+                            className={`p-4 rounded-2xl cursor-pointer border transition-all text-left ${
+                              isSelected
+                                ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-850"
+                                : "bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700"
+                            }`}
+                          >
+                            <div className="flex justify-between items-start gap-2 mb-2">
+                              <div className="flex items-center gap-2">
+                                {t.user?.avatar ? (
+                                  <img src={t.user.avatar} className="w-6 h-6 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 font-bold text-[10px]">
+                                    {t.user?.name?.charAt(0) || "?"}
+                                  </div>
+                                )}
+                                <div>
+                                  <h4 className="font-bold text-gray-900 dark:text-white text-xs truncate max-w-[120px]">{t.user?.name}</h4>
+                                  <span className="text-[10px] text-gray-400 dark:text-gray-500 capitalize">{t.user?.role || "user"}</span>
+                                </div>
+                              </div>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded capitalize ${
+                                t.status === "resolved" 
+                                  ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-450"
+                                  : "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-450"
+                              }`}>
+                                {t.status || "open"}
+                              </span>
+                            </div>
+                            
+                            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                              <span className="font-semibold text-gray-700 dark:text-gray-300">{lastSender}</span>
+                              {lastMsg}
+                            </p>
+                            
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 block font-mono text-right">{dateStr}</span>
+                          </div>
+                        );
+                      })}
+                      
+                    {tickets.length === 0 && (
+                      <div className="text-center py-12 text-gray-500 dark:text-gray-400 text-xs">No tickets found.</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right panel: Conversation pane */}
+                <div className="flex-1 flex flex-col h-full bg-white dark:bg-gray-900">
+                  {selectedTicket ? (
+                    <div className="flex flex-col h-full">
+                      {/* Header */}
+                      <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50/30 dark:bg-gray-950/10">
+                        <div className="flex items-center gap-3">
+                          {selectedTicket.user?.avatar ? (
+                            <img src={selectedTicket.user.avatar} className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-800" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 font-bold text-sm">
+                              {selectedTicket.user?.name?.charAt(0) || "?"}
+                            </div>
+                          )}
+                          <div className="text-left">
+                            <h3 className="font-bold text-gray-900 dark:text-white text-sm">{selectedTicket.user?.name}</h3>
+                            <p className="text-[11px] text-gray-550 dark:text-gray-400">{selectedTicket.user?.email}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleToggleTicketStatus(selectedTicket.id, selectedTicket.status)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 border ${
+                              selectedTicket.status === 'resolved'
+                                ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50 hover:bg-amber-100'
+                                : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800/50 hover:bg-green-100'
+                            }`}
+                          >
+                            {selectedTicket.status === 'resolved' ? 'Reopen Ticket' : 'Mark as Resolved'}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Messages Area */}
+                      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                        {/* Initial Ticket Message */}
+                        <div className="flex items-start gap-3 max-w-[80%] text-left">
+                          {selectedTicket.user?.avatar ? (
+                            <img src={selectedTicket.user.avatar} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 font-bold text-xs flex-shrink-0">
+                              {selectedTicket.user?.name?.charAt(0) || "?"}
+                            </div>
+                          )}
+                          <div>
+                            <div className="bg-gray-100 dark:bg-gray-800 px-4 py-3 rounded-2xl rounded-tl-none">
+                              <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">{selectedTicket.message}</p>
+                            </div>
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 block px-1">
+                              {new Date(selectedTicket.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Reply Chain */}
+                        {selectedTicket.replies?.map((reply: any) => {
+                          const isUser = reply.sender === 'user';
+                          return (
+                            <div key={reply.id} className={`flex items-start gap-3 max-w-[80%] ${isUser ? 'text-left' : 'ml-auto text-right flex-row-reverse'}`}>
+                              {isUser ? (
+                                selectedTicket.user?.avatar ? (
+                                  <img src={selectedTicket.user.avatar} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 font-bold text-xs flex-shrink-0">
+                                    {selectedTicket.user?.name?.charAt(0) || "?"}
+                                  </div>
+                                )
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                                  S
+                                </div>
+                              )}
+                              <div>
+                                <div className={`px-4 py-3 rounded-2xl ${
+                                  isUser 
+                                    ? 'bg-gray-100 dark:bg-gray-800 rounded-tl-none text-gray-900 dark:text-gray-100' 
+                                    : 'bg-blue-600 text-white rounded-tr-none'
+                                }`}>
+                                  <p className="text-sm whitespace-pre-wrap leading-relaxed text-left">{reply.message}</p>
+                                </div>
+                                <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 block px-1">
+                                  {new Date(reply.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Reply Input Box */}
+                      <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50/20 dark:bg-gray-950/10">
+                        <form onSubmit={handleSendReply} className="flex gap-3">
+                          <textarea
+                            value={replyText}
+                            onChange={e => setReplyText(e.target.value)}
+                            disabled={selectedTicket.status === 'resolved'}
+                            placeholder={selectedTicket.status === 'resolved' ? "This ticket is resolved. Reopen it to reply." : "Type your official support response..."}
+                            rows={2}
+                            className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 rounded-2xl text-sm outline-none focus:border-blue-500 dark:text-white transition-colors resize-none disabled:opacity-50"
+                          />
+                          <button
+                            type="submit"
+                            disabled={isSendingReply || !replyText.trim() || selectedTicket.status === 'resolved'}
+                            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-5 rounded-2xl font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/20"
+                          >
+                            {isSendingReply ? (
+                              <Loader2 className="animate-spin" size={18} />
+                            ) : (
+                              <>
+                                <Send size={16} />
+                                Reply
+                              </>
+                            )}
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-gray-500 dark:text-gray-400">
+                      <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-3xl flex items-center justify-center mb-4 text-gray-400">
+                        <MessageSquare size={32} />
+                      </div>
+                      <h3 className="font-bold text-gray-950 dark:text-white mb-1">Select a Support Ticket</h3>
+                      <p className="text-xs">Click on a ticket in the left sidebar to view history and send a response.</p>
+            )}
+
+            {/* FINANCE TAB */}
+            {activeTab === "Finance" && (
+              <div className="space-y-6">
+                {/* Finance Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm text-left">
+                    <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mb-4">
+                      <Coins className="text-blue-600 dark:text-blue-400" size={24} />
+                    </div>
+                    <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Total Transacted Volume</p>
+                    <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">
+                      ₹{earnings.reduce((sum, item) => sum + (item.totalEarned || 0) + (item.pendingAmount || 0), 0)}
+                    </h3>
+                  </div>
+
+                  <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm text-left">
+                    <div className="w-12 h-12 bg-amber-50 dark:bg-amber-900/20 rounded-2xl flex items-center justify-center mb-4">
+                      <Coins className="text-amber-600 dark:text-amber-400" size={24} />
+                    </div>
+                    <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Total Pending Payouts</p>
+                    <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">
+                      ₹{earnings.reduce((sum, item) => sum + (item.pendingAmount || 0), 0)}
+                    </h3>
+                  </div>
+
+                  <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm text-left">
+                    <div className="w-12 h-12 bg-green-50 dark:bg-green-900/20 rounded-2xl flex items-center justify-center mb-4">
+                      <Coins className="text-green-600 dark:text-green-400" size={24} />
+                    </div>
+                    <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Paid Out to Workers</p>
+                    <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">
+                      ₹{earnings.reduce((sum, item) => sum + (item.totalEarned || 0), 0)}
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Dual-pane Ledger Panel */}
+                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl overflow-hidden shadow-sm flex flex-col lg:flex-row h-[60vh]">
+                  {/* Left Sidebar: Worker list */}
+                  <div className="w-full lg:w-96 border-r border-gray-200 dark:border-gray-800 flex flex-col h-full bg-gray-50/50 dark:bg-gray-950/20">
+                    <div className="p-4 border-b border-gray-200 dark:border-gray-800 space-y-3">
+                      <h3 className="font-black text-gray-900 dark:text-white text-base text-left">Worker Ledgers</h3>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                        <input
+                          type="text"
+                          placeholder="Search workers..."
+                          value={financeSearch}
+                          onChange={e => setFinanceSearch(e.target.value)}
+                          className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 pl-8 pr-4 py-2 rounded-xl text-xs outline-none focus:border-blue-500 dark:text-white transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                      {earnings
+                        .filter(e => {
+                          if (!financeSearch) return true;
+                          const lower = financeSearch.toLowerCase();
+                          return (
+                            e.user?.name?.toLowerCase().includes(lower) ||
+                            e.user?.email?.toLowerCase().includes(lower)
+                          );
+                        })
+                        .map(e => {
+                          const isSelected = selectedWorkerEarnings?.userId === e.userId;
+                          return (
+                            <div
+                              key={e.userId}
+                              onClick={() => setSelectedWorkerEarnings(e)}
+                              className={`p-4 rounded-2xl cursor-pointer border transition-all text-left ${
+                                isSelected
+                                  ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-850"
+                                  : "bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                {e.user?.avatar ? (
+                                  <img src={e.user.avatar} className="w-8 h-8 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 font-bold text-[10px]">
+                                    {e.user?.name?.charAt(0) || "?"}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-bold text-gray-900 dark:text-white text-xs truncate">{e.user?.name}</h4>
+                                  <span className="text-[10px] text-gray-400 dark:text-gray-500 truncate block">{e.user?.email}</span>
+                                </div>
+                              </div>
+                              <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800/50 flex justify-between text-[11px]">
+                                <div>
+                                  <span className="text-gray-400 dark:text-gray-500">Paid:</span>
+                                  <span className="font-bold text-gray-900 dark:text-white ml-1">₹{e.totalEarned}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-400 dark:text-gray-500">Pending:</span>
+                                  <span className={`font-black ml-1 ${e.pendingAmount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400'}`}>₹{e.pendingAmount}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      {earnings.length === 0 && (
+                        <div className="text-center py-12 text-gray-500 text-xs">No ledgers found.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Panel: Transaction details */}
+                  <div className="flex-1 flex flex-col h-full bg-white dark:bg-gray-900">
+                    {selectedWorkerEarnings ? (
+                      <div className="flex flex-col h-full overflow-hidden">
+                        {/* Selected Worker Info Header */}
+                        <div className="p-5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-950/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                          <div className="flex items-center gap-3">
+                            {selectedWorkerEarnings.user?.avatar ? (
+                              <img src={selectedWorkerEarnings.user.avatar} className="w-12 h-12 rounded-full object-cover border border-gray-200 dark:border-gray-850" />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 font-bold text-base">
+                                {selectedWorkerEarnings.user?.name?.charAt(0) || "?"}
+                              </div>
+                            )}
+                            <div className="text-left">
+                              <h3 className="font-bold text-gray-900 dark:text-white text-base">{selectedWorkerEarnings.user?.name}</h3>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{selectedWorkerEarnings.user?.email}</p>
+                              {selectedWorkerEarnings.user?.phone && (
+                                <p className="text-[11px] font-mono text-gray-400 dark:text-gray-550 mt-0.5">{selectedWorkerEarnings.user.phone}</p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex gap-4 bg-white dark:bg-gray-850 border border-gray-200 dark:border-gray-800 p-3 rounded-2xl">
+                            <div className="text-left pr-4 border-r border-gray-200 dark:border-gray-800">
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Total Earned</span>
+                              <span className="text-lg font-black text-green-600 dark:text-green-400">₹{selectedWorkerEarnings.totalEarned}</span>
+                            </div>
+                            <div className="text-left">
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Pending</span>
+                              <span className="text-lg font-black text-amber-600 dark:text-amber-400">₹{selectedWorkerEarnings.pendingAmount}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Transactions Table */}
+                        <div className="flex-1 overflow-y-auto p-5">
+                          <h4 className="text-xs font-black uppercase text-gray-450 dark:text-gray-500 tracking-wider mb-4 text-left">Transaction Ledger</h4>
+                          <div className="border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden">
+                            <table className="w-full text-sm text-left">
+                              <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-650 dark:text-gray-400 font-bold text-xs uppercase">
+                                <tr>
+                                  <th className="px-6 py-4">Date</th>
+                                  <th className="px-6 py-4">Description</th>
+                                  <th className="px-6 py-4">Amount</th>
+                                  <th className="px-6 py-4">Status</th>
+                                  <th className="px-6 py-4 text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-150 dark:divide-gray-800">
+                                {selectedWorkerEarnings.transactions?.slice().reverse().map((tx: any) => (
+                                  <tr key={tx.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-850/30">
+                                    <td className="px-6 py-4 font-medium text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{tx.date}</td>
+                                    <td className="px-6 py-4 font-bold text-gray-900 dark:text-white text-left">
+                                      {tx.jobTitle || 'Event Payout'}
+                                      <span className="text-[10px] block font-medium text-gray-450 dark:text-gray-500 mt-0.5 capitalize">{tx.type || 'payout'}</span>
+                                    </td>
+                                    <td className="px-6 py-4 font-mono font-black text-gray-900 dark:text-white">₹{tx.amount}</td>
+                                    <td className="px-6 py-4">
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize ${
+                                        tx.status === 'completed' 
+                                          ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-450' 
+                                          : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-450'
+                                      }`}>
+                                        {tx.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                                      {tx.status === 'pending' ? (
+                                        <button
+                                          onClick={() => handleProcessPayout(selectedWorkerEarnings.userId, tx.id, tx.amount)}
+                                          disabled={isProcessingPayout}
+                                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition-all shadow-md shadow-blue-500/10 active:scale-95 disabled:opacity-50"
+                                        >
+                                          Process Payout
+                                        </button>
+                                      ) : (
+                                        <span className="text-xs text-gray-400 dark:text-gray-550 font-medium">None Required</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                                {(!selectedWorkerEarnings.transactions || selectedWorkerEarnings.transactions.length === 0) && (
+                                  <tr>
+                                    <td colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400 text-xs">No transactions recorded.</td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center p-8 text-gray-500 dark:text-gray-400">
+                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-3xl flex items-center justify-center mb-4 text-gray-400">
+                          <Coins size={32} />
+                        </div>
+                        <h3 className="font-bold text-gray-950 dark:text-white mb-1">Select a Worker Ledger</h3>
+                        <p className="text-xs">Click on any worker in the left panel to review transactions and process payouts.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
