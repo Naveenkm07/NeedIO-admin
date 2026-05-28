@@ -32,4 +32,15 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ id, verified }),
   }),
+
+  // ADMIN: Update user
+  updateUser: (id: string, data: { name?: string; email?: string }) => fetchWithAuth(`/admin/users/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+
+  // ADMIN: Delete user
+  deleteUser: (id: string) => fetchWithAuth(`/admin/users/${id}`, {
+    method: 'DELETE',
+  }),
 };
