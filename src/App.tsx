@@ -366,20 +366,24 @@ export default function App() {
                         <div className="flex items-center justify-between">
                           <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate pr-4">{company.name}</h3>
                           {/* Actions */}
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => setViewingUser(company)} className="p-1.5 text-gray-400 hover:text-green-500 transition-colors" title="View Full Details">
-                              <Eye size={16} />
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => setViewingUser(company)} className="p-2 text-gray-500 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors" title="View Full Details">
+                              <Eye size={18} />
                             </button>
-                            <button onClick={() => openEditModal(company)} className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors" title="Edit Name/Email">
-                              <Edit2 size={16} />
+                            <button onClick={() => openEditModal(company)} className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Edit Name/Email">
+                              <Edit2 size={18} />
                             </button>
-                            <button onClick={() => handleDelete(company.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Delete User">
-                              <Trash2 size={16} />
+                            <button onClick={() => handleDelete(company.id)} className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete User">
+                              <Trash2 size={18} />
                             </button>
                           </div>
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">{company.email}</p>
-                        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono mt-1 opacity-50" title={company.id}>ID: {company.id}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
+                          <span className="font-semibold text-gray-700 dark:text-gray-300">GSTIN:</span> 
+                          <span className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-[11px]">{company.gstin || 'Not Provided'}</span>
+                        </p>
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono mt-2 opacity-50" title={company.id}>ID: {company.id}</p>
                       </div>
                     </div>
 
@@ -432,20 +436,24 @@ export default function App() {
                         <div className="flex items-center justify-between">
                           <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate pr-4">{worker.name}</h3>
                           {/* Actions */}
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => setViewingUser(worker)} className="p-1.5 text-gray-400 hover:text-green-500 transition-colors" title="View Full Details">
-                              <Eye size={16} />
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => setViewingUser(worker)} className="p-2 text-gray-500 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors" title="View Full Details">
+                              <Eye size={18} />
                             </button>
-                            <button onClick={() => openEditModal(worker)} className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors" title="Edit Name/Email">
-                              <Edit2 size={16} />
+                            <button onClick={() => openEditModal(worker)} className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Edit Name/Email">
+                              <Edit2 size={18} />
                             </button>
-                            <button onClick={() => handleDelete(worker.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Delete User">
-                              <Trash2 size={16} />
+                            <button onClick={() => handleDelete(worker.id)} className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete User">
+                              <Trash2 size={18} />
                             </button>
                           </div>
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">{worker.email}</p>
-                        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono mt-1 opacity-50" title={worker.id}>ID: {worker.id}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
+                          <span className="font-semibold text-gray-700 dark:text-gray-300">Phone:</span> 
+                          <span className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-[11px]">{worker.phone || 'Not Provided'}</span>
+                        </p>
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono mt-2 opacity-50" title={worker.id}>ID: {worker.id}</p>
                       </div>
                     </div>
                   </div>
