@@ -46,4 +46,8 @@ export const api = {
 
   // ADMIN: Get raw auth users
   getAuthUsers: () => fetchWithAuth('/admin/auth-users'),
+
+  // ADMIN: Get live feed
+  getJobs: () => fetchWithAuth('/jobs'),
+  getAllApplications: () => fetchWithAuth('/admin/applications'),
 };

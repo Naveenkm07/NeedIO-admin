@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Shield, CheckCircle2, XCircle, Loader2, LogOut, Edit2, Trash2, Moon, Sun, Users, Building2, Briefcase, Eye } from "lucide-react";
+import { Shield, CheckCircle2, XCircle, Loader2, LogOut, Edit2, Trash2, Moon, Sun, Users, Building2, Briefcase, Eye, Activity, CalendarDays, ClipboardCheck } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { api } from "./api";
 import { supabase } from "./supabase";
@@ -15,6 +15,8 @@ export default function App() {
 
   const [users, setUsers] = useState<any[]>([]);
   const [authUsers, setAuthUsers] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Dark Mode State
@@ -79,12 +81,16 @@ export default function App() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const [profilesData, authData] = await Promise.all([
+      const [profilesData, authData, jobsData, appsData] = await Promise.all([
         api.getUsers(),
-        api.getAuthUsers()
+        api.getAuthUsers(),
+        api.getJobs(),
+        api.getAllApplications()
       ]);
       setUsers(profilesData);
       setAuthUsers(authData);
+      setJobs(jobsData);
+      setApplications(appsData);
     } catch (err: any) {
       toast.error(err.message || "Failed to load data");
     } finally {
@@ -256,12 +262,12 @@ export default function App() {
           <div className="max-w-7xl mx-auto space-y-8">
             
             {/* STATS ROW */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
               <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
                 <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl flex items-center justify-center mb-4">
                   <Shield className="text-indigo-600 dark:text-indigo-400" size={24} />
                 </div>
-                <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Total Authenticated</p>
+                <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Total Auth</p>
                 <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">{authUsers.length}</h3>
               </div>
 
@@ -269,7 +275,7 @@ export default function App() {
                 <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mb-4">
                   <Users className="text-blue-600 dark:text-blue-400" size={24} />
                 </div>
-                <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Completed Profiles</p>
+                <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Profiles</p>
                 <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">{users.length}</h3>
               </div>
               
@@ -301,6 +307,22 @@ export default function App() {
                 </div>
                 <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Verified</p>
                 <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">{verifiedCount}</h3>
+              </div>
+
+              <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 bg-orange-50 dark:bg-orange-900/20 rounded-2xl flex items-center justify-center mb-4">
+                  <CalendarDays className="text-orange-600 dark:text-orange-400" size={24} />
+                </div>
+                <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Total Jobs</p>
+                <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">{jobs.length}</h3>
+              </div>
+
+              <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 bg-pink-50 dark:bg-pink-900/20 rounded-2xl flex items-center justify-center mb-4">
+                  <ClipboardCheck className="text-pink-600 dark:text-pink-400" size={24} />
+                </div>
+                <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Applications</p>
+                <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">{applications.length}</h3>
               </div>
             </div>
 
@@ -354,6 +376,85 @@ export default function App() {
                 </div>
               </div>
             )}
+            
+            {/* LIVE ACTIVITY FEED */}
+            <section className="mt-8 pb-4">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-3">
+                  <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 w-8 h-8 flex items-center justify-center rounded-xl text-sm"><Activity size={18} /></span>
+                  Live Platform Activity
+                </h2>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Recent Jobs */}
+                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl overflow-hidden shadow-sm">
+                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 border-b border-gray-200 dark:border-gray-800 font-bold text-gray-700 dark:text-gray-300">
+                    Latest Jobs Posted
+                  </div>
+                  <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
+                    {jobs.length === 0 ? (
+                      <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4">No jobs posted yet.</p>
+                    ) : (
+                      jobs.slice().reverse().map((job) => (
+                        <div key={job.id} className="border border-gray-100 dark:border-gray-800 rounded-2xl p-4 bg-gray-50/50 dark:bg-gray-800/30">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-bold text-gray-900 dark:text-white">{job.title}</h4>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{job.company}</p>
+                            </div>
+                            <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-2 py-1 rounded font-bold">{job.pay}</span>
+                          </div>
+                          <div className="mt-3 flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+                            <span className="flex items-center gap-1"><Users size={12}/> {job.workersNeeded} needed</span>
+                            <span className="flex items-center gap-1"><CheckCircle2 size={12}/> {job.totalApplied || 0} applied</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Recent Applications */}
+                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl overflow-hidden shadow-sm">
+                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 border-b border-gray-200 dark:border-gray-800 font-bold text-gray-700 dark:text-gray-300">
+                    Recent Worker Applications
+                  </div>
+                  <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
+                    {applications.length === 0 ? (
+                      <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4">No applications submitted yet.</p>
+                    ) : (
+                      applications.slice().reverse().map((app) => (
+                        <div key={app.id} className="border border-gray-100 dark:border-gray-800 rounded-2xl p-4 bg-gray-50/50 dark:bg-gray-800/30">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                              {app.workerAvatar ? (
+                                <img src={app.workerAvatar} className="w-8 h-8 rounded-full object-cover" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 font-bold text-xs">
+                                  {app.workerName?.charAt(0) || "?"}
+                                </div>
+                              )}
+                              <div>
+                                <h4 className="font-bold text-gray-900 dark:text-white text-sm">{app.workerName}</h4>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Applied for <span className="font-bold text-gray-700 dark:text-gray-300">{app.jobTitle}</span></p>
+                              </div>
+                            </div>
+                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${
+                              app.status === 'accepted' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                              app.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                              'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            }`}>
+                              {app.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
             
             {/* COMPANIES LIST */}
             <section id="companies-section">
