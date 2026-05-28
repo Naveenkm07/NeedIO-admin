@@ -254,7 +254,10 @@ export default function App() {
                 <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">{users.length}</h3>
               </div>
               
-              <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
+              <div 
+                onClick={() => document.getElementById('companies-section')?.scrollIntoView({ behavior: 'smooth' })}
+                className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow cursor-pointer hover:border-purple-200 dark:hover:border-purple-800/50"
+              >
                 <div className="w-12 h-12 bg-purple-50 dark:bg-purple-900/20 rounded-2xl flex items-center justify-center mb-4">
                   <Building2 className="text-purple-600 dark:text-purple-400" size={24} />
                 </div>
@@ -262,7 +265,10 @@ export default function App() {
                 <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">{companies.length}</h3>
               </div>
 
-              <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
+              <div 
+                onClick={() => document.getElementById('workers-section')?.scrollIntoView({ behavior: 'smooth' })}
+                className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow cursor-pointer hover:border-teal-200 dark:hover:border-teal-800/50"
+              >
                 <div className="w-12 h-12 bg-teal-50 dark:bg-teal-900/20 rounded-2xl flex items-center justify-center mb-4">
                   <Briefcase className="text-teal-600 dark:text-teal-400" size={24} />
                 </div>
@@ -331,7 +337,7 @@ export default function App() {
             )}
             
             {/* COMPANIES LIST */}
-            <section>
+            <section id="companies-section">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-3">
                   <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 w-8 h-8 flex items-center justify-center rounded-xl text-sm">{companies.length}</span>
@@ -394,7 +400,7 @@ export default function App() {
             </section>
 
             {/* WORKERS LIST */}
-            <section className="pb-12">
+            <section id="workers-section" className="pb-12">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-3">
                   <span className="bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 w-8 h-8 flex items-center justify-center rounded-xl text-sm">{workers.length}</span>
