@@ -74,6 +74,12 @@ export default function App() {
   useEffect(() => {
     if (session) {
       loadUsers();
+      
+      // Live sync every 5 seconds silently
+      const interval = setInterval(() => {
+        loadUsers(true);
+      }, 5000);
+      return () => clearInterval(interval);
     }
   }, [session]);
 
@@ -91,9 +97,9 @@ export default function App() {
     await supabase.auth.signOut();
   };
 
-  const loadUsers = async () => {
+  const loadUsers = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [profilesData, authData, jobsData, appsData, faqsData] = await Promise.all([
         api.getUsers(),
         api.getAuthUsers(),
@@ -107,9 +113,9 @@ export default function App() {
       setApplications(appsData);
       setFaqs(faqsData);
     } catch (err: any) {
-      toast.error(err.message || "Failed to load data");
+      if (!silent) toast.error(err.message || "Failed to load data");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -245,6 +251,59 @@ export default function App() {
     }
   };
   // ---------------------
+  
+  // Data processing and filtering
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery) return users;
+    const lowerQuery = searchQuery.toLowerCase();
+    return users.filter(u => 
+      u.name?.toLowerCase().includes(lowerQuery) || 
+      u.email?.toLowerCase().includes(lowerQuery) ||
+      u.phone?.includes(lowerQuery) ||
+      u.gstin?.toLowerCase().includes(lowerQuery)
+    );
+  }, [users, searchQuery]);
+
+  const filteredJobs = useMemo(() => {
+    if (!searchQuery) return jobs;
+    const lowerQuery = searchQuery.toLowerCase();
+    return jobs.filter(j => 
+      j.title?.toLowerCase().includes(lowerQuery) || 
+      j.company?.toLowerCase().includes(lowerQuery)
+    );
+  }, [jobs, searchQuery]);
+
+  const filteredApps = useMemo(() => {
+    if (!searchQuery) return applications;
+    const lowerQuery = searchQuery.toLowerCase();
+    return applications.filter(a => 
+      a.workerName?.toLowerCase().includes(lowerQuery) || 
+      a.jobTitle?.toLowerCase().includes(lowerQuery)
+    );
+  }, [applications, searchQuery]);
+
+  const companies = filteredUsers.filter((u) => u.role === "company");
+  const workers = filteredUsers.filter((u) => u.role === "worker");
+  const verifiedCount = filteredUsers.filter(u => u.verified).length;
+
+  // Incomplete profiles are authUsers who don't have a corresponding profile id
+  const incompleteProfiles = authUsers.filter(au => !users.find(u => u.id === au.id)).filter(au => {
+    if (!searchQuery) return true;
+    const lowerQuery = searchQuery.toLowerCase();
+    return au.email?.toLowerCase().includes(lowerQuery) || au.user_metadata?.full_name?.toLowerCase().includes(lowerQuery);
+  });
+
+  // Chart Data
+  const roleData = [
+    { name: 'Companies', value: companies.length, color: '#3b82f6' }, // blue-500
+    { name: 'Workers', value: workers.length, color: '#14b8a6' }, // teal-500
+  ];
+
+  const verifyData = [
+    { name: 'Verified', value: verifiedCount, color: '#22c55e' }, // green-500
+    { name: 'Unverified', value: companies.length - verifiedCount, color: '#f59e0b' }, // amber-500
+  ];
+
 
   if (loadingSession) {
     return (
@@ -300,58 +359,6 @@ export default function App() {
       </div>
     );
   }
-
-  // Data processing and filtering
-  const filteredUsers = useMemo(() => {
-    if (!searchQuery) return users;
-    const lowerQuery = searchQuery.toLowerCase();
-    return users.filter(u => 
-      u.name?.toLowerCase().includes(lowerQuery) || 
-      u.email?.toLowerCase().includes(lowerQuery) ||
-      u.phone?.includes(lowerQuery) ||
-      u.gstin?.toLowerCase().includes(lowerQuery)
-    );
-  }, [users, searchQuery]);
-
-  const filteredJobs = useMemo(() => {
-    if (!searchQuery) return jobs;
-    const lowerQuery = searchQuery.toLowerCase();
-    return jobs.filter(j => 
-      j.title?.toLowerCase().includes(lowerQuery) || 
-      j.company?.toLowerCase().includes(lowerQuery)
-    );
-  }, [jobs, searchQuery]);
-
-  const filteredApps = useMemo(() => {
-    if (!searchQuery) return applications;
-    const lowerQuery = searchQuery.toLowerCase();
-    return applications.filter(a => 
-      a.workerName?.toLowerCase().includes(lowerQuery) || 
-      a.jobTitle?.toLowerCase().includes(lowerQuery)
-    );
-  }, [applications, searchQuery]);
-
-  const companies = filteredUsers.filter((u) => u.role === "company");
-  const workers = filteredUsers.filter((u) => u.role === "worker");
-  const verifiedCount = filteredUsers.filter(u => u.verified).length;
-
-  // Incomplete profiles are authUsers who don't have a corresponding profile id
-  const incompleteProfiles = authUsers.filter(au => !users.find(u => u.id === au.id)).filter(au => {
-    if (!searchQuery) return true;
-    const lowerQuery = searchQuery.toLowerCase();
-    return au.email?.toLowerCase().includes(lowerQuery) || au.user_metadata?.full_name?.toLowerCase().includes(lowerQuery);
-  });
-
-  // Chart Data
-  const roleData = [
-    { name: 'Companies', value: companies.length, color: '#3b82f6' }, // blue-500
-    { name: 'Workers', value: workers.length, color: '#14b8a6' }, // teal-500
-  ];
-
-  const verifyData = [
-    { name: 'Verified', value: verifiedCount, color: '#22c55e' }, // green-500
-    { name: 'Unverified', value: companies.length - verifiedCount, color: '#f59e0b' }, // amber-500
-  ];
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
