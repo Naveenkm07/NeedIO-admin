@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Shield, CheckCircle2, XCircle, Loader2, LogOut, Edit2, Trash2, Moon, Sun, Users, Building2, Briefcase } from "lucide-react";
+import { Shield, CheckCircle2, XCircle, Loader2, LogOut, Edit2, Trash2, Moon, Sun, Users, Building2, Briefcase, Eye } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { api } from "./api";
 import { supabase } from "./supabase";
@@ -20,6 +20,9 @@ export default function App() {
   const [isDark, setIsDark] = useState(() => {
     return localStorage.getItem("theme") === "dark" || (!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches);
   });
+
+  // View Modal State
+  const [viewingUser, setViewingUser] = useState<any>(null);
 
   // Edit Modal State
   const [editingUser, setEditingUser] = useState<any>(null);
@@ -364,10 +367,13 @@ export default function App() {
                           <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate pr-4">{company.name}</h3>
                           {/* Actions */}
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => openEditModal(company)} className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors">
+                            <button onClick={() => setViewingUser(company)} className="p-1.5 text-gray-400 hover:text-green-500 transition-colors" title="View Full Details">
+                              <Eye size={16} />
+                            </button>
+                            <button onClick={() => openEditModal(company)} className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors" title="Edit Name/Email">
                               <Edit2 size={16} />
                             </button>
-                            <button onClick={() => handleDelete(company.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+                            <button onClick={() => handleDelete(company.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Delete User">
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -427,10 +433,13 @@ export default function App() {
                           <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate pr-4">{worker.name}</h3>
                           {/* Actions */}
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => openEditModal(worker)} className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors">
+                            <button onClick={() => setViewingUser(worker)} className="p-1.5 text-gray-400 hover:text-green-500 transition-colors" title="View Full Details">
+                              <Eye size={16} />
+                            </button>
+                            <button onClick={() => openEditModal(worker)} className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors" title="Edit Name/Email">
                               <Edit2 size={16} />
                             </button>
-                            <button onClick={() => handleDelete(worker.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+                            <button onClick={() => handleDelete(worker.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Delete User">
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -488,6 +497,55 @@ export default function App() {
                 className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-blue-500/30 flex items-center justify-center disabled:opacity-50"
               >
                 {isSaving ? <Loader2 size={20} className="animate-spin" /> : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW DETAILS MODAL */}
+      {viewingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="bg-white dark:bg-gray-900 w-full max-w-2xl p-6 rounded-3xl shadow-2xl border border-gray-200 dark:border-gray-800 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-3">
+                {viewingUser.avatar ? (
+                  <img src={viewingUser.avatar} className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 font-bold">
+                    {viewingUser.name?.charAt(0) || "?"}
+                  </div>
+                )}
+                User Details
+              </h3>
+              <button onClick={() => setViewingUser(null)} className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+                <XCircle size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(viewingUser).map(([key, value]) => {
+                  if (key === 'avatar' || typeof value === 'object' && value !== null && !Array.isArray(value)) return null;
+                  
+                  return (
+                    <div key={key} className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
+                      <span className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">{key}</span>
+                      <span className="block text-sm font-medium text-gray-900 dark:text-white break-words">
+                        {Array.isArray(value) ? value.join(', ') : String(value || '—')}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            
+            <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800 flex justify-end">
+              <button 
+                onClick={() => setViewingUser(null)}
+                className="px-6 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>
