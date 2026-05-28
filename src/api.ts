@@ -43,4 +43,7 @@ export const api = {
   deleteUser: (id: string) => fetchWithAuth(`/admin/users/${id}`, {
     method: 'DELETE',
   }),
+
+  // ADMIN: Get raw auth users
+  getAuthUsers: () => fetchWithAuth('/admin/auth-users'),
 };

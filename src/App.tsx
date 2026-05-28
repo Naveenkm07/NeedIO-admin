@@ -14,6 +14,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
 
   const [users, setUsers] = useState<any[]>([]);
+  const [authUsers, setAuthUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Dark Mode State
@@ -78,10 +79,14 @@ export default function App() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const data = await api.getUsers();
-      setUsers(data);
+      const [profilesData, authData] = await Promise.all([
+        api.getUsers(),
+        api.getAuthUsers()
+      ]);
+      setUsers(profilesData);
+      setAuthUsers(authData);
     } catch (err: any) {
-      toast.error(err.message || "Failed to load users");
+      toast.error(err.message || "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -195,6 +200,9 @@ export default function App() {
   const workers = users.filter((u) => u.role === "worker");
   const verifiedCount = users.filter(u => u.verified).length;
 
+  // Incomplete profiles are authUsers who don't have a corresponding profile id
+  const incompleteProfiles = authUsers.filter(au => !users.find(u => u.id === au.id));
+
   // Chart Data
   const roleData = [
     { name: 'Companies', value: companies.length, color: '#3b82f6' }, // blue-500
@@ -248,12 +256,20 @@ export default function App() {
           <div className="max-w-7xl mx-auto space-y-8">
             
             {/* STATS ROW */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
+              <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl flex items-center justify-center mb-4">
+                  <Shield className="text-indigo-600 dark:text-indigo-400" size={24} />
+                </div>
+                <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Total Authenticated</p>
+                <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">{authUsers.length}</h3>
+              </div>
+
               <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
                 <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mb-4">
                   <Users className="text-blue-600 dark:text-blue-400" size={24} />
                 </div>
-                <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Total Users</p>
+                <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Completed Profiles</p>
                 <h3 className="text-3xl font-black text-gray-900 dark:text-white mt-1">{users.length}</h3>
               </div>
               
@@ -460,6 +476,46 @@ export default function App() {
                 ))}
               </div>
             </section>
+
+            {/* INCOMPLETE PROFILES LIST */}
+            {incompleteProfiles.length > 0 && (
+              <section className="pb-12">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-3">
+                    <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 w-8 h-8 flex items-center justify-center rounded-xl text-sm">{incompleteProfiles.length}</span>
+                    Incomplete Profiles <span className="text-sm font-medium text-gray-500">(Google OAuth / Not Setup)</span>
+                  </h2>
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {incompleteProfiles.map((au) => (
+                    <div key={au.id} className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm transition-all">
+                      <div className="flex items-start gap-4">
+                        <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-900/20 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center border border-indigo-100 dark:border-indigo-900/50">
+                          {au.user_metadata?.avatar_url ? (
+                            <img src={au.user_metadata.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-xl font-black text-indigo-500 dark:text-indigo-400">?</span>
+                          )}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-gray-900 dark:text-white text-lg truncate pr-4">
+                            {au.user_metadata?.full_name || au.email?.split('@')[0] || "Unknown"}
+                          </h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">{au.email}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2">
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">Provider:</span> 
+                            <span className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-[11px] capitalize">{au.app_metadata?.provider || 'Email'}</span>
+                          </p>
+                          <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono mt-2 opacity-50" title={au.id}>ID: {au.id}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
           </div>
         </div>
