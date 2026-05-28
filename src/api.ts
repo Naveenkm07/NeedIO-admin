@@ -50,4 +50,25 @@ export const api = {
   // ADMIN: Get live feed
   getJobs: () => fetchWithAuth('/jobs'),
   getAllApplications: () => fetchWithAuth('/admin/applications'),
+
+  // ADMIN: Job Moderation
+  deleteJob: (id: string) => fetchWithAuth(`/admin/jobs/${id}`, { method: 'DELETE' }),
+
+  // ADMIN: Announcements
+  sendAnnouncement: (data: { title: string; message: string }) => fetchWithAuth('/admin/announcements', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  // ADMIN: FAQ Management
+  getFaqs: () => fetchWithAuth('/faq'),
+  createFaq: (data: any) => fetchWithAuth('/admin/faqs', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  updateFaq: (id: string, data: any) => fetchWithAuth(`/admin/faqs/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  deleteFaq: (id: string) => fetchWithAuth(`/admin/faqs/${id}`, { method: 'DELETE' }),
 };

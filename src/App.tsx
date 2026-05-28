@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Shield, CheckCircle2, XCircle, Loader2, LogOut, Edit2, Trash2, Moon, Sun, Users, Building2, Briefcase, Eye, Activity, CalendarDays, ClipboardCheck } from "lucide-react";
+import { Shield, CheckCircle2, XCircle, Loader2, LogOut, Edit2, Trash2, Moon, Sun, Users, Building2, Briefcase, Eye, Activity, CalendarDays, ClipboardCheck, Search, Download, Megaphone, HelpCircle, Plus } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { api } from "./api";
 import { supabase } from "./supabase";
@@ -17,7 +17,20 @@ export default function App() {
   const [authUsers, setAuthUsers] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
+  const [faqs, setFaqs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // App Navigation & Search
+  const [activeTab, setActiveTab] = useState("Dashboard");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Announcements State
+  const [annTitle, setAnnTitle] = useState("");
+  const [annMessage, setAnnMessage] = useState("");
+
+  // FAQ State
+  const [editingFaq, setEditingFaq] = useState<any>(null);
+  const [faqForm, setFaqForm] = useState({ question: "", answer: "", category: "", tags: "" });
 
   // Dark Mode State
   const [isDark, setIsDark] = useState(() => {
@@ -81,16 +94,18 @@ export default function App() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const [profilesData, authData, jobsData, appsData] = await Promise.all([
+      const [profilesData, authData, jobsData, appsData, faqsData] = await Promise.all([
         api.getUsers(),
         api.getAuthUsers(),
         api.getJobs(),
-        api.getAllApplications()
+        api.getAllApplications(),
+        api.getFaqs()
       ]);
       setUsers(profilesData);
       setAuthUsers(authData);
       setJobs(jobsData);
       setApplications(appsData);
+      setFaqs(faqsData);
     } catch (err: any) {
       toast.error(err.message || "Failed to load data");
     } finally {
@@ -134,18 +149,102 @@ export default function App() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to completely delete this user? This cannot be undone!")) return;
+    if (!window.confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
     try {
-      toast.loading("Deleting user...");
       await api.deleteUser(id);
-      setUsers(users.filter(u => u.id !== id));
-      toast.dismiss();
-      toast.success("User deleted forever.");
+      setUsers(users.filter((u) => u.id !== id));
+      toast.success("User deleted successfully");
     } catch (err: any) {
-      toast.dismiss();
-      toast.error(err.message || "Failed to delete");
+      toast.error(err.message || "Failed to delete user");
     }
   };
+
+  // --- NEW HANDLERS ---
+  const handleExportCSV = () => {
+    const csvRows = [];
+    const headers = ['ID', 'Email', 'Role', 'Name', 'Phone', 'GSTIN', 'Verified'];
+    csvRows.push(headers.join(','));
+
+    for (const row of users) {
+      const values = [
+        row.id,
+        row.email,
+        row.role,
+        row.name,
+        row.phone || '',
+        row.gstin || '',
+        row.verified ? 'Yes' : 'No'
+      ];
+      csvRows.push(values.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+    }
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'workforyou_users.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleSendAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!annTitle || !annMessage) return toast.error("Title and message required");
+    try {
+      const res = await api.sendAnnouncement({ title: annTitle, message: annMessage });
+      toast.success(`Sent to ${res.count} users successfully!`);
+      setAnnTitle("");
+      setAnnMessage("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send announcement");
+    }
+  };
+
+  const handleDeleteJob = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this job?")) return;
+    try {
+      await api.deleteJob(id);
+      setJobs(jobs.filter(j => j.id !== id));
+      toast.success("Job deleted successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete job");
+    }
+  };
+
+  const handleSaveFaq = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingFaq) {
+        const res = await api.updateFaq(editingFaq.id, faqForm);
+        setFaqs(faqs.map(f => f.id === editingFaq.id ? res : f));
+        toast.success("FAQ updated");
+      } else {
+        const res = await api.createFaq({
+          ...faqForm,
+          tags: faqForm.tags.split(',').map(t => t.trim())
+        });
+        setFaqs([...faqs, res]);
+        toast.success("FAQ created");
+      }
+      setFaqForm({ question: "", answer: "", category: "", tags: "" });
+      setEditingFaq(null);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save FAQ");
+    }
+  };
+
+  const handleDeleteFaq = async (id: string) => {
+    if (!window.confirm("Delete this FAQ?")) return;
+    try {
+      await api.deleteFaq(id);
+      setFaqs(faqs.filter(f => f.id !== id));
+      toast.success("FAQ deleted");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete FAQ");
+    }
+  };
+  // ---------------------
 
   if (loadingSession) {
     return (
@@ -202,12 +301,46 @@ export default function App() {
     );
   }
 
-  const companies = users.filter((u) => u.role === "company");
-  const workers = users.filter((u) => u.role === "worker");
-  const verifiedCount = users.filter(u => u.verified).length;
+  // Data processing and filtering
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery) return users;
+    const lowerQuery = searchQuery.toLowerCase();
+    return users.filter(u => 
+      u.name?.toLowerCase().includes(lowerQuery) || 
+      u.email?.toLowerCase().includes(lowerQuery) ||
+      u.phone?.includes(lowerQuery) ||
+      u.gstin?.toLowerCase().includes(lowerQuery)
+    );
+  }, [users, searchQuery]);
+
+  const filteredJobs = useMemo(() => {
+    if (!searchQuery) return jobs;
+    const lowerQuery = searchQuery.toLowerCase();
+    return jobs.filter(j => 
+      j.title?.toLowerCase().includes(lowerQuery) || 
+      j.company?.toLowerCase().includes(lowerQuery)
+    );
+  }, [jobs, searchQuery]);
+
+  const filteredApps = useMemo(() => {
+    if (!searchQuery) return applications;
+    const lowerQuery = searchQuery.toLowerCase();
+    return applications.filter(a => 
+      a.workerName?.toLowerCase().includes(lowerQuery) || 
+      a.jobTitle?.toLowerCase().includes(lowerQuery)
+    );
+  }, [applications, searchQuery]);
+
+  const companies = filteredUsers.filter((u) => u.role === "company");
+  const workers = filteredUsers.filter((u) => u.role === "worker");
+  const verifiedCount = filteredUsers.filter(u => u.verified).length;
 
   // Incomplete profiles are authUsers who don't have a corresponding profile id
-  const incompleteProfiles = authUsers.filter(au => !users.find(u => u.id === au.id));
+  const incompleteProfiles = authUsers.filter(au => !users.find(u => u.id === au.id)).filter(au => {
+    if (!searchQuery) return true;
+    const lowerQuery = searchQuery.toLowerCase();
+    return au.email?.toLowerCase().includes(lowerQuery) || au.user_metadata?.full_name?.toLowerCase().includes(lowerQuery);
+  });
 
   // Chart Data
   const roleData = [
@@ -225,7 +358,7 @@ export default function App() {
       <Toaster theme={isDark ? 'dark' : 'light'} />
       
       {/* Premium Header */}
-      <div className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
+      <div className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-500/20">
             <Shield className="text-white" size={24} />
@@ -235,17 +368,54 @@ export default function App() {
             <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-1">Superuser Dashboard</p>
           </div>
         </div>
-        <div className="flex items-center gap-6">
+
+        {/* Navigation Tabs */}
+        <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-2xl">
+          {["Dashboard", "Jobs", "Announcements", "FAQ"].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                activeTab === tab 
+                  ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm" 
+                  : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          {/* Global Search */}
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search users, jobs, emails..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 pl-10 pr-4 py-2 rounded-xl text-sm outline-none focus:border-blue-500 dark:text-white transition-colors"
+            />
+          </div>
+
+          <button 
+            onClick={handleExportCSV}
+            title="Export CSV"
+            className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            <Download size={18} />
+          </button>
+
           <button 
             onClick={() => setIsDark(!isDark)}
-            className="p-2.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           >
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
           
-          <div className="flex items-center gap-3 pl-6 border-l border-gray-200 dark:border-gray-800">
-            <span className="text-gray-600 dark:text-gray-300 text-sm font-medium hidden md:block">{session.user.email}</span>
-            <button onClick={handleLogout} className="p-2.5 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
+          <div className="flex items-center gap-3 pl-4 border-l border-gray-200 dark:border-gray-800">
+            <button onClick={handleLogout} className="p-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
               <LogOut size={18} />
             </button>
           </div>
@@ -261,7 +431,9 @@ export default function App() {
         <div className="flex-1 overflow-y-auto px-4 md:px-8 py-8">
           <div className="max-w-7xl mx-auto space-y-8">
             
-            {/* STATS ROW */}
+            {activeTab === "Dashboard" && (
+              <div className="space-y-8">
+                {/* STATS ROW */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
               <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
                 <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl flex items-center justify-center mb-4">
@@ -616,6 +788,142 @@ export default function App() {
                   ))}
                 </div>
               </section>
+            )}
+            </div>
+            )}
+
+            {/* JOBS MODERATION TAB */}
+            {activeTab === "Jobs" && (
+              <section className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+                <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+                  <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-3">
+                    <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 w-10 h-10 flex items-center justify-center rounded-2xl"><Briefcase size={20} /></span>
+                    Job Moderation
+                  </h2>
+                  <span className="text-sm font-bold text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full">{filteredJobs.length} Jobs</span>
+                </div>
+                <div className="p-6">
+                  {filteredJobs.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500 dark:text-gray-400">No jobs found matching your search.</div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filteredJobs.map(job => (
+                        <div key={job.id} className="border border-gray-200 dark:border-gray-800 rounded-2xl p-5 hover:border-orange-500 dark:hover:border-orange-500 transition-colors">
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h3 className="font-bold text-gray-900 dark:text-white text-lg">{job.title}</h3>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">{job.company}</p>
+                            </div>
+                            <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-2 py-1 rounded font-bold">{job.pay}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 line-clamp-2">{job.description}</p>
+                          <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100 dark:border-gray-800">
+                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{job.date}</span>
+                            <button onClick={() => handleDeleteJob(job.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors" title="Delete Job">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* ANNOUNCEMENTS TAB */}
+            {activeTab === "Announcements" && (
+              <section className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm max-w-2xl mx-auto">
+                <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+                  <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-3">
+                    <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 w-10 h-10 flex items-center justify-center rounded-2xl"><Megaphone size={20} /></span>
+                    Global Announcement
+                  </h2>
+                </div>
+                <form onSubmit={handleSendAnnouncement} className="p-6 space-y-6">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Notification Title</label>
+                    <input 
+                      type="text" 
+                      value={annTitle}
+                      onChange={e => setAnnTitle(e.target.value)}
+                      placeholder="e.g. New Feature Release!"
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 rounded-xl text-gray-900 dark:text-white outline-none focus:border-purple-500 transition-colors"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Message Body</label>
+                    <textarea 
+                      value={annMessage}
+                      onChange={e => setAnnMessage(e.target.value)}
+                      placeholder="Write your announcement here. It will be sent to every user's notification inbox."
+                      rows={5}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 rounded-xl text-gray-900 dark:text-white outline-none focus:border-purple-500 transition-colors resize-none"
+                      required
+                    />
+                  </div>
+                  <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2">
+                    <Megaphone size={18} />
+                    Send to {users.length} Users
+                  </button>
+                </form>
+              </section>
+            )}
+
+            {/* FAQ TAB */}
+            {activeTab === "FAQ" && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-1">
+                  <form onSubmit={handleSaveFaq} className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 space-y-4 sticky top-24">
+                    <h3 className="font-black text-gray-900 dark:text-white mb-4 text-lg">{editingFaq ? 'Edit FAQ' : 'Add New FAQ'}</h3>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Question</label>
+                      <input type="text" value={faqForm.question} onChange={e => setFaqForm({...faqForm, question: e.target.value})} required className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-xl text-sm outline-none focus:border-blue-500 dark:text-white transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Answer</label>
+                      <textarea value={faqForm.answer} onChange={e => setFaqForm({...faqForm, answer: e.target.value})} required rows={3} className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-xl text-sm outline-none focus:border-blue-500 dark:text-white transition-colors resize-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Category</label>
+                      <input type="text" value={faqForm.category} onChange={e => setFaqForm({...faqForm, category: e.target.value})} placeholder="e.g. payments, jobs" required className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-xl text-sm outline-none focus:border-blue-500 dark:text-white transition-colors" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Tags (comma separated)</label>
+                      <input type="text" value={faqForm.tags} onChange={e => setFaqForm({...faqForm, tags: e.target.value})} placeholder="e.g. money, bank" required className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-xl text-sm outline-none focus:border-blue-500 dark:text-white transition-colors" />
+                    </div>
+                    <div className="pt-2 flex gap-3">
+                      {editingFaq && (
+                        <button type="button" onClick={() => { setEditingFaq(null); setFaqForm({question:'',answer:'',category:'',tags:''}); }} className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-bold py-3 rounded-xl transition-colors">Cancel</button>
+                      )}
+                      <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-500/30">{editingFaq ? 'Update FAQ' : 'Save FAQ'}</button>
+                    </div>
+                  </form>
+                </div>
+                
+                <div className="lg:col-span-2 space-y-4">
+                  {faqs.map(faq => (
+                    <div key={faq.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 hover:border-blue-300 dark:hover:border-blue-800 transition-colors shadow-sm">
+                      <div className="flex justify-between items-start gap-4">
+                        <div>
+                          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1 block">{faq.category}</span>
+                          <h4 className="font-bold text-gray-900 dark:text-white text-lg">{faq.question}</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{faq.answer}</p>
+                          <div className="flex flex-wrap gap-2 mt-4">
+                            {faq.tags?.map((t: string) => <span key={t} className="bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-[10px] uppercase font-bold px-2 py-1 rounded">{t}</span>)}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2 flex-shrink-0">
+                          <button onClick={() => { setEditingFaq(faq); setFaqForm({ question: faq.question, answer: faq.answer, category: faq.category, tags: faq.tags?.join(', ') || '' }); }} className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl transition-colors"><Edit2 size={16}/></button>
+                          <button onClick={() => handleDeleteFaq(faq.id)} className="p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl transition-colors"><Trash2 size={16}/></button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {faqs.length === 0 && <div className="text-center py-12 text-gray-500">No FAQs found. Add one!</div>}
+                </div>
+              </div>
             )}
 
           </div>
