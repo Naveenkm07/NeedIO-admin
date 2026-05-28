@@ -1422,7 +1422,13 @@ export default function App() {
                       </div>
                       <h3 className="font-bold text-gray-950 dark:text-white mb-1">Select a Support Ticket</h3>
                       <p className="text-xs">Click on a ticket in the left sidebar to view history and send a response.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
+
+
 
             {/* FINANCE TAB */}
             {activeTab === "Finance" && (
