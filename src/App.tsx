@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Shield, CheckCircle2, XCircle, Loader2, LogOut, Edit2, Trash2, Moon, Sun, Users, Building2, Briefcase, Eye, Activity, CalendarDays, ClipboardCheck, Search, Download, Megaphone, HelpCircle, Plus } from "lucide-react";
+import { Shield, CheckCircle2, XCircle, Loader2, LogOut, Edit2, Trash2, Moon, Sun, Users, Building2, Briefcase, Eye, Activity, CalendarDays, ClipboardCheck, Search, Download, Megaphone } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { api } from "./api";
 import { supabase } from "./supabase";
@@ -273,14 +273,6 @@ export default function App() {
     );
   }, [jobs, searchQuery]);
 
-  const filteredApps = useMemo(() => {
-    if (!searchQuery) return applications;
-    const lowerQuery = searchQuery.toLowerCase();
-    return applications.filter(a => 
-      a.workerName?.toLowerCase().includes(lowerQuery) || 
-      a.jobTitle?.toLowerCase().includes(lowerQuery)
-    );
-  }, [applications, searchQuery]);
 
   const companies = filteredUsers.filter((u) => u.role === "company");
   const workers = filteredUsers.filter((u) => u.role === "worker");
