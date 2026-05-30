@@ -25,7 +25,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
 
 export const api = {
   // ADMIN: List all users with their roles
-  getUsers: () => fetchWithAuth('/users'),
+  getUsers: () => fetchWithAuth('/admin/users'),
 
   // ADMIN: Toggle verify status
   verifyUser: (id: string, verified: boolean) => fetchWithAuth('/admin/verify', {
