@@ -403,13 +403,17 @@ export default function App() {
   });
 
   // Chart Data
-  const roleData = [
+  const roleData = users.length === 0 ? [
+    { name: 'No Data', value: 1, color: '#374151' }
+  ] : [
     { name: 'Companies', value: companies.length, color: '#3b82f6' }, // blue-500
     { name: 'Workers', value: workers.length, color: '#14b8a6' }, // teal-500
   ];
 
   const verifiedCompaniesCount = companies.filter((c) => c.verified).length;
-  const verifyData = [
+  const verifyData = companies.length === 0 ? [
+    { name: 'No Data', value: 1, color: '#374151' }
+  ] : [
     { name: 'Verified', value: verifiedCompaniesCount, color: '#22c55e' }, // green-500
     { name: 'Unverified', value: companies.length - verifiedCompaniesCount, color: '#f59e0b' }, // amber-500
   ];
