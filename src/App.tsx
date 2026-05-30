@@ -354,6 +354,19 @@ export default function App() {
       setIsProcessingPayout(false);
     }
   };
+  const handleVerifyUser = async (id: string, currentStatus: boolean) => {
+    try {
+      const newStatus = !currentStatus;
+      toast.loading(newStatus ? "Verifying user..." : "Removing verification...");
+      await api.verifyUser(id, newStatus);
+      setUsers(users.map(u => u.id === id ? { ...u, verified: newStatus } : u));
+      toast.dismiss();
+      toast.success(newStatus ? "User Verified" : "Verification Removed");
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error("Failed to update verification status");
+    }
+  };
   // ---------------------
   
   // Data processing and filtering
@@ -979,6 +992,17 @@ export default function App() {
                             </button>
                             <button onClick={() => openEditModal(worker)} className="p-2 text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Edit Name/Email">
                               <Edit2 size={18} />
+                            </button>
+                            <button 
+                              onClick={() => handleVerifyUser(worker.id, !!worker.verified)} 
+                              className={`p-2 rounded-lg transition-colors ${
+                                worker.verified 
+                                  ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40' 
+                                  : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                              }`} 
+                              title={worker.verified ? "Remove Verification" : "Verify Worker"}
+                            >
+                              <ClipboardCheck size={18} />
                             </button>
                             <button 
                               onClick={() => handleToggleSuspend(worker.id, worker.suspended)} 
