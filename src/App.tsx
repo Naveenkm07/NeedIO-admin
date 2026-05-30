@@ -408,9 +408,10 @@ export default function App() {
     { name: 'Workers', value: workers.length, color: '#14b8a6' }, // teal-500
   ];
 
+  const verifiedCompaniesCount = companies.filter((c) => c.verified).length;
   const verifyData = [
-    { name: 'Verified', value: verifiedCount, color: '#22c55e' }, // green-500
-    { name: 'Unverified', value: companies.length - verifiedCount, color: '#f59e0b' }, // amber-500
+    { name: 'Verified', value: verifiedCompaniesCount, color: '#22c55e' }, // green-500
+    { name: 'Unverified', value: companies.length - verifiedCompaniesCount, color: '#f59e0b' }, // amber-500
   ];
 
   // Advanced Visual Charts Data (Last 7 Days)
